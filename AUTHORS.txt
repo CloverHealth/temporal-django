@@ -1,0 +1,9 @@
+Temporal Django was originally created in 2017 at Clover Health.
+
+List of contributors:
+
+  Paul Zumbrun <paul.zumbrun@cloverhealth.com>
+
+Based on temporal-sqlalchemy; credit goes to all of its authors!
+
+  https://github.com/CloverHealth/temporal-sqlalchemy/blob/master/AUTHORS.txt
