@@ -48,9 +48,4 @@ setuptools.setup(
     ],
     setup_requires=SETUP_DEPENDENCIES,
     test_suite='tests.runtests.run_tests',
-    tests_require=[
-        'tox==2.9.1',
-        'tox-pyenv==1.1.0',
-        'freezegun==0.3.9',
-    ],
 )
