@@ -1,4 +1,5 @@
 import datetime
+import typing  # noqa
 
 from django.db import models
 
@@ -37,8 +38,8 @@ class Clocked(models.Model):
     clock = None  # type: models.ForeignKey
     """The clock history of this object"""
 
-    temporal_options = None  # type: ClockedOption
-    """Configuration and state for the temporal behaviors of this object"""
+    temporal_options = None  # type: typing.ClassVar[ClockedOption]
+    """Configuration and state for the temporal behaviors of this model"""
 
     activity = None  # type: models.Model
     """Use this to set the activity for the next save"""
