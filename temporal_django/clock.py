@@ -11,6 +11,7 @@ import uuid
 
 from django.contrib.postgres.fields.ranges import DateTimeRangeField, IntegerRangeField
 from django.db import models
+from django.db.models.signals import post_init
 from django.utils import timezone
 import psycopg2.extras as psql_extras
 
@@ -49,7 +50,7 @@ def add_clock(*fields, activity_model=None, temporal_schema='public'):
             activity_model=activity_model,
         )
 
-        _attach_state_hooks(cls)
+        post_init.connect(_save_initial_state_post_init, sender=cls)
         _disable_bulk_create(cls)
 
         return cls
@@ -153,22 +154,18 @@ def _build_field_history_model(cls: typing.Type[Clocked], field: str, schema: st
     return model
 
 
-def _attach_state_hooks(cls: typing.Type[Clocked]):
+def _save_initial_state_post_init(sender: typing.Type[Clocked], instance: Clocked, **kwargs):
     """
-    Update the init method of the Clocked class to record field values when we instantiate
-    this model. We use this to decide when to update a temporal history field on save.
+    After initializing a Clocked object, record initial field values.
+
+    We'll use this to decide when to update a temporal history field on save.
 
     Args:
-        cls (typing.Type[Clocked])
+        sender (typing.Type[Clocked])
+        instance (Clocked)
     """
-    _wrapped_init = cls.__init__
-
-    def _new_init(self: Clocked, *args, **kwargs):
-        _wrapped_init(self, *args, **kwargs)
-        fields = cls.temporal_options.temporal_fields
-        self._state.previous = {f: self._meta.get_field(f).value_from_object(self) for f in fields}
-
-    cls.__init__ = _new_init
+    fields = sender.temporal_options.temporal_fields
+    instance._state.previous = {f: instance._meta.get_field(f).value_from_object(instance) for f in fields}
 
 
 def _disable_bulk_create(cls: typing.Type[Clocked]):
