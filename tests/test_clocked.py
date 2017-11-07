@@ -15,16 +15,16 @@ class ClockedTests(TestCase):
 
             obj = TestModel(title='Test', num=1)
 
-            self.assertIsNone(obj.date_created)
-            self.assertIsNone(obj.date_modified)
+            self.assertIsNone(obj.date_created())
+            self.assertIsNone(obj.date_modified())
 
             obj.activity = act
             obj.save()
 
             created_obj = TestModel.objects.first()
             self.assertEqual(created_obj.title, 'Test')
-            self.assertEqual(created_obj.date_created, datetime.datetime(2017, 10, 31))
-            self.assertEqual(created_obj.date_created, created_obj.date_modified)
+            self.assertEqual(created_obj.date_created(), datetime.datetime(2017, 10, 31))
+            self.assertEqual(created_obj.date_created(), created_obj.date_modified())
 
         with freeze_time('2017-11-01'):
             act = TestModelActivity(desc='Edit the object')
@@ -37,8 +37,8 @@ class ClockedTests(TestCase):
             edited_obj = TestModel.objects.first()
 
             self.assertEqual(edited_obj.title, 'Test 2')
-            self.assertEqual(edited_obj.date_created, datetime.datetime(2017, 10, 31))
-            self.assertEqual(edited_obj.date_modified, datetime.datetime(2017, 11, 1))
+            self.assertEqual(edited_obj.date_created(), datetime.datetime(2017, 10, 31))
+            self.assertEqual(edited_obj.date_modified(), datetime.datetime(2017, 11, 1))
 
     def test_first_and_latest_tick(self):
         """The first_tick and latest_tick models should also work"""
@@ -50,8 +50,8 @@ class ClockedTests(TestCase):
         obj.save()
 
         created_obj = TestModel.objects.first()
-        self.assertEqual(created_obj.first_tick.tick, 1)
-        self.assertEqual(created_obj.first_tick.tick, created_obj.vclock)
+        self.assertEqual(created_obj.first_tick().tick, 1)
+        self.assertEqual(created_obj.first_tick().tick, created_obj.vclock)
 
         act = TestModelActivity(desc='Edit the object')
         act.save()
@@ -62,9 +62,9 @@ class ClockedTests(TestCase):
 
         edited_obj = TestModel.objects.first()
 
-        self.assertEqual(created_obj.first_tick.tick, 1)
-        self.assertEqual(created_obj.latest_tick.tick, 2)
-        self.assertEqual(created_obj.latest_tick.tick, edited_obj.vclock)
+        self.assertEqual(created_obj.first_tick().tick, 1)
+        self.assertEqual(created_obj.latest_tick().tick, 2)
+        self.assertEqual(created_obj.latest_tick().tick, edited_obj.vclock)
 
     def test_no_changes_no_tick(self):
         """Verify that if you don't change anything, but do a save, that no tick is created"""
@@ -76,8 +76,8 @@ class ClockedTests(TestCase):
         obj.save()
 
         created_obj = TestModel.objects.first()
-        self.assertEqual(created_obj.first_tick.tick, 1)
-        self.assertEqual(created_obj.first_tick.tick, created_obj.vclock)
+        self.assertEqual(created_obj.first_tick().tick, 1)
+        self.assertEqual(created_obj.first_tick().tick, created_obj.vclock)
 
         act = TestModelActivity(desc='Edit the object')
         act.save()
@@ -86,6 +86,6 @@ class ClockedTests(TestCase):
 
         edited_obj = TestModel.objects.first()
 
-        self.assertEqual(created_obj.first_tick.tick, 1)
-        self.assertEqual(created_obj.latest_tick.tick, 1)
-        self.assertEqual(created_obj.latest_tick.tick, edited_obj.vclock)
+        self.assertEqual(created_obj.first_tick().tick, 1)
+        self.assertEqual(created_obj.latest_tick().tick, 1)
+        self.assertEqual(created_obj.latest_tick().tick, edited_obj.vclock)

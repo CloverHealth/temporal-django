@@ -44,7 +44,6 @@ setuptools.setup(
     install_requires=[
         'psycopg2>=2.6.2',
         'Django>=1.11.0',
-        'typing>=3.5.2,<4.0.0;python_version<"3.5"'
     ],
     setup_requires=SETUP_DEPENDENCIES,
     test_suite='tests.runtests.run_tests',
