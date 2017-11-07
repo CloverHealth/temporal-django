@@ -1,0 +1,53 @@
+{% extends 'example_app/base.html' %}
+
+{% block content %}
+<div class="row">
+  <div class="col">
+    <h1>{{ item.title }}</h1>
+  </div>
+  <div class="col">
+    <a href="{% url 'example_app:update' item.id %}" class="pull-right btn btn-primary">
+      Edit item <span class="fa fa-edit"></span>
+    </a>
+  </div>
+</div>
+<div class="row">
+  <div class="col">
+    <h2>Item properties</h2>
+    <dl>
+      <dt>Title</dt>
+      <dd>{{ item.title }}</dd>
+
+      <dt>Number</dt>
+      <dd>{{ item.number }}</dd>
+
+      <dt>Effective Date</dt>
+      <dd>{{ item.effective_date }}</dd>
+    </dl>
+  </div>
+  <div class="col">
+    <h2>Item history</h2>
+    {% for timeline_entry in item.temporal_timeline %}
+      <div class="card">
+        <div class="card-body">
+          <p class="small text-muted pull-right">{{ timeline_entry.clock.timestamp }}</p>
+          <p>
+            {% if timeline_entry.clock.tick == 1 %}Created{% else %}Modified{% endif %} by
+            {% if timeline_entry.clock.activity.author %}
+              {{ timeline_entry.clock.activity.author }}
+            {% else %}
+              Anonymous user
+            {% endif %}
+          </p>
+          <blockquote class="blockquote">{{ timeline_entry.clock.activity.description|linebreaks }}</blockquote>
+          <ul>
+            {% for field in timeline_entry.changed_fields.values %}
+              <li>Set <strong>{{ field.label }}</strong> to <code>{{ field.value }}</code></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
