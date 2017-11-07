@@ -18,13 +18,10 @@ class ItemUpdateView(UpdateView):
 
     def form_valid(self, form):
         self.object = form.save(commit=False)
-        activity = ItemActivity(
+        self.object.save(activity=ItemActivity(
             description=form.cleaned_data['description'],
             author=self.request.user if self.request.user.is_authenticated() else None
-        )
-        self.object.activity = activity
-        activity.save()
-        self.object.save()
+        ))
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
@@ -37,13 +34,10 @@ class ItemCreateView(CreateView):
 
     def form_valid(self, form):
         self.object = form.save(commit=False)
-        activity = ItemActivity(
+        self.object.save(activity=ItemActivity(
             description=form.cleaned_data['description'],
             author=self.request.user if self.request.user.is_authenticated() else None
-        )
-        self.object.activity = activity
-        activity.save()
-        self.object.save()
+        ))
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):

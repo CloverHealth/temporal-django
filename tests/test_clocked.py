@@ -1,5 +1,6 @@
 import datetime
 
+from django.db.utils import IntegrityError
 from django.test import TestCase
 from freezegun import freeze_time
 
@@ -19,16 +20,12 @@ class ClockedTests(TestCase):
     def test_date_created_and_modified(self):
         """The date_created and date_modified properties should work"""
         with freeze_time('2017-10-31'):
-            act = TestModelActivity(desc='Create the object')
-            act.save()
-
             obj = TestModel(title='Test', num=1)
 
             self.assertIsNone(obj.date_created())
             self.assertIsNone(obj.date_modified())
 
-            obj.activity = act
-            obj.save()
+            obj.save(activity=TestModelActivity(desc='Create the object'))
 
             created_obj = TestModel.objects.first()
             self.assertEqual(created_obj.title, 'Test')
@@ -36,12 +33,8 @@ class ClockedTests(TestCase):
             self.assertEqual(created_obj.date_created(), created_obj.date_modified())
 
         with freeze_time('2017-11-01'):
-            act = TestModelActivity(desc='Edit the object')
-            act.save()
-
             created_obj.title = 'Test 2'
-            created_obj.activity = act
-            created_obj.save()
+            created_obj.save(activity=TestModelActivity(desc='Edit the object'))
 
             edited_obj = TestModel.objects.first()
 
@@ -51,23 +44,15 @@ class ClockedTests(TestCase):
 
     def test_first_and_latest_tick(self):
         """The first_tick and latest_tick models should also work"""
-        act = TestModelActivity(desc='Create the object')
-        act.save()
-
         obj = TestModel(title='Test', num=1)
-        obj.activity = act
-        obj.save()
+        obj.save(activity=TestModelActivity(desc='Create the object'))
 
         created_obj = TestModel.objects.first()
         self.assertEqual(created_obj.first_tick().tick, 1)
         self.assertEqual(created_obj.first_tick().tick, created_obj.vclock)
 
-        act = TestModelActivity(desc='Edit the object')
-        act.save()
-
         created_obj.title = 'Test 2'
-        created_obj.activity = act
-        created_obj.save()
+        created_obj.save(activity=TestModelActivity(desc='Edit the object'))
 
         edited_obj = TestModel.objects.first()
 
@@ -77,21 +62,14 @@ class ClockedTests(TestCase):
 
     def test_no_changes_no_tick(self):
         """Verify that if you don't change anything, but do a save, that no tick is created"""
-        act = TestModelActivity(desc='Create the object')
-        act.save()
-
         obj = TestModel(title='Test', num=1)
-        obj.activity = act
-        obj.save()
+        obj.save(activity=TestModelActivity(desc='Create the object'))
 
         created_obj = TestModel.objects.first()
         self.assertEqual(created_obj.first_tick().tick, 1)
         self.assertEqual(created_obj.first_tick().tick, created_obj.vclock)
 
-        act = TestModelActivity(desc='Edit the object')
-        act.save()
-        created_obj.activity = act
-        created_obj.save()
+        created_obj.save(activity=TestModelActivity(desc='Edit the object'))
 
         edited_obj = TestModel.objects.first()
 
@@ -104,26 +82,17 @@ class ClockedTests(TestCase):
 
         # Re-use the data from this test:
         with freeze_time('2017-10-31'):
-            act = TestModelActivity(desc='Create the object')
-            act.save()
             obj = TestModel(title='Test', num=1)
-            obj.activity = act
-            obj.save()
+            obj.save(activity=TestModelActivity(desc='Create the object'))
 
         with freeze_time('2017-11-01'):
-            act = TestModelActivity(desc='Edit the object')
-            act.save()
             obj.title = 'Test 2'
-            obj.activity = act
-            obj.save()
+            obj.save(activity=TestModelActivity(desc='Edit the object'))
 
         with freeze_time('2017-11-02'):
-            act = TestModelActivity(desc='Do a third edit')
-            act.save()
             obj = TestModel.objects.first()
             obj.num = 5
-            obj.activity = act
-            obj.save()
+            obj.save(activity=TestModelActivity(desc='Do a third edit'))
 
         with self.assertNumQueries(3):  # One query for the object, one for each field
             timeline = obj.temporal_timeline()
@@ -151,24 +120,16 @@ class ClockedTests(TestCase):
         stub = Stub(title='Test stub')
         stub.save()
 
-        act = TestModelActivityWithRelationship(stub=stub)
-        act.save()
-
         obj = TestModelWithActivityWithRelationship(title='Test object')
-        obj.activity = act
-        obj.save()
+        obj.save(activity=TestModelActivityWithRelationship(stub=stub))
 
         with self.assertNumQueries(3):  # One query for the clock, one for the field, one for the stub.
             timeline = obj.temporal_timeline()
             with self.assertNumQueries(1):
                 self.assertEqual(timeline[0].clock.activity.stub.title, 'Test stub')
 
-        act = TestModelActivityWithEfficientRelationship(stub=stub)
-        act.save()
-
         obj = TestModelWithActivityWithEfficientRelationship(title='Test object')
-        obj.activity = act
-        obj.save()
+        obj.save(activity=TestModelActivityWithEfficientRelationship(stub=stub))
 
         with self.assertNumQueries(2):  # One query for the clock, one for the field.
             timeline = obj.temporal_timeline()
@@ -185,3 +146,25 @@ class ClockedTests(TestCase):
 
         timeline = obj.temporal_timeline()
         self.assertIsNone(timeline[0].clock.activity)
+
+    def test_atomic_save(self):
+        """
+        Verify that saves are atomic
+
+        If we crash down in the temporal update, the original object shouldn't save.
+        """
+
+        # Create a bogus scenario that will fail:
+        obj = NoActivityModel(title='Object', num=1)
+        obj.save()
+
+        with self.assertRaises(IntegrityError):
+            obj.vclock = 0
+            obj.title = 'No save!'
+            obj.save()
+
+        # retrieve the object from the db and verify nothing was saved
+        saved_obj = NoActivityModel.objects.first()
+        self.assertEqual(saved_obj.title, 'Object')
+        self.assertEqual(saved_obj.clock.count(), 1)
+        self.assertEqual(saved_obj.title_history.count(), 1)
