@@ -32,11 +32,13 @@ class InternalClockedOption(ClockedOption):
         """receiver for pre_save signal on a Clocked subclass"""
         # We'll check this in the post_save receiver to see if we need to set
         # the initial clock/history
-        instance._state.temporal_add = instance._state.adding
+        if instance:
+            instance._state._django_temporal_add = instance._state.adding
 
     def post_save_receiver(self, sender, instance=None, **kwargs):
         """receiver for post_save signal on a Clocked subclass"""
-        self._record_history(instance)
+        if instance:
+            self._record_history(instance)
 
     def pre_delete_receiver(self, sender, **kwargs):
         """receiver for pre_delete signal on a Clocked subclass"""
@@ -67,7 +69,8 @@ class InternalClockedOption(ClockedOption):
         changed_fields = {}
         for field, history_model in self.history_models.items():
             new_val = clocked._meta.get_field(field).value_from_object(clocked)
-            if clocked._state.temporal_add or (new_val != clocked._state.previous[field]):
+            prev_val = clocked._state._django_temporal_previous[field]
+            if new_val != prev_val or clocked._state._django_temporal_add:
                 changed_fields[(field, history_model)] = new_val
 
         if not changed_fields:
@@ -95,16 +98,22 @@ class InternalClockedOption(ClockedOption):
         #
         for (field, history_model), new_val in changed_fields.items():
             if new_tick > 1:
-                # This is an update. Record the upper bounds of the previous tick
-                with connection.cursor() as cursor:
-                    # TODO: Try to rewrite with the ORM
-                    query = """
-                        update {}
-                        set vclock=int4range(lower(vclock), %s),
-                            effective=tstzrange(lower(effective), %s)
-                        where entity_id=%s and lower(vclock)=%s
-                        """.format(connection.ops.quote_name(history_model._meta.db_table))
-                    cursor.execute(query, [new_tick, timestamp, clocked.pk, new_tick - 1])
+                # This is an update, not a create, so update the upper bounds of the previous tick.
+                #
+                # This cannot be done with F expressions because of the range updates, unless we write our
+                # own implementations of int4range/tstzrange.
+                #
+                # Instead use .raw and force execution by wrapping with list(). This approach ensures that
+                # the update happens in the correct connection/transaction.
+                list(history_model.objects.raw(
+                    """ UPDATE {table_name}
+                        SET vclock = int4range(lower(vclock), %s),
+                            effective = tstzrange(lower(effective), %s)
+                        WHERE entity_id = %s AND upper(vclock) IS NULL
+                        RETURNING id;
+                    """.format(table_name=connection.ops.quote_name(history_model._meta.db_table)),
+                    [new_tick, timestamp, clocked.pk]
+                ))
 
             hist = history_model(**{field: new_val},
                                  entity=clocked,
@@ -113,7 +122,7 @@ class InternalClockedOption(ClockedOption):
             hist.save()
 
             # Update the stored state for this field to detect future changes
-            clocked._state.previous[field] = new_val
+            clocked._state._django_temporal_previous[field] = new_val
 
         # Reset the activity so it can't be accidentally reused easily
         clocked.activity = None

@@ -5,15 +5,12 @@ Implements the add_clock function which takes a Clocked model and builds the app
 EntityClock and FieldHistory models, and attaches the ClockedOption.
 """
 import hashlib
-import sys
 import typing
 import uuid
 
 from django.contrib.postgres.fields.ranges import DateTimeRangeField, IntegerRangeField
 from django.db import models
 from django.db.models.signals import post_init
-from django.utils import timezone
-import psycopg2.extras as psql_extras
 
 from .db_extensions import GistIndex, GistExclusionConstraint
 
@@ -89,6 +86,8 @@ def _build_entity_clock_model(
         timestamp=models.DateTimeField(auto_now_add=True),
         activity=models.ForeignKey(activity_model) if activity_model else None,
         Meta=type('Meta', (), {
+            'app_label': cls._meta.app_label,
+            'ordering': ['tick'],  # Sort by tick so that first_tick and latest_tick work correctly
             'db_table': clock_table_name,
             'unique_together': unique_constraints,
         }),
@@ -97,7 +96,6 @@ def _build_entity_clock_model(
 
     clock_class_name = '%sClock' % cls.__name__
     clock_model = type(clock_class_name, (EntityClock,), attrs)
-    setattr(sys.modules[cls.__module__], clock_class_name, clock_model)
 
     return clock_model
 
@@ -124,10 +122,14 @@ def _build_field_history_model(cls: typing.Type[Clocked], field: str, schema: st
 
     attrs = dict(
         id=models.UUIDField(primary_key=True, default=uuid.uuid4),
-        entity=models.ForeignKey(cls),
-        effective=DateTimeRangeField(default=psql_extras.DateTimeRange(timezone.now(), None)),
+        entity=models.ForeignKey(
+            cls,
+            related_name='%s_history' % field,
+        ),
+        effective=DateTimeRangeField(),
         vclock=IntegerRangeField(),
         Meta=type('Meta', (), {
+            'app_label': cls._meta.app_label,
             'db_table': table_name,
             'indexes': [
                 GistIndex(
@@ -150,7 +152,6 @@ def _build_field_history_model(cls: typing.Type[Clocked], field: str, schema: st
     attrs[field] = next(f for f in cls._meta.fields if f.name == field)
 
     model = type(class_name, (FieldHistory,), attrs)
-    setattr(sys.modules[cls.__module__], class_name, model)
     return model
 
 
@@ -165,7 +166,9 @@ def _save_initial_state_post_init(sender: typing.Type[Clocked], instance: Clocke
         instance (Clocked)
     """
     fields = sender.temporal_options.temporal_fields
-    instance._state.previous = {f: instance._meta.get_field(f).value_from_object(instance) for f in fields}
+    instance._state._django_temporal_previous = {
+        f: instance._meta.get_field(f).value_from_object(instance) for f in fields
+    }
 
 
 def _disable_bulk_create(cls: typing.Type[Clocked]):

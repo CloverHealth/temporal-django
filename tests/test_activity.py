@@ -80,8 +80,8 @@ class ActivityTests(TestCase):
         obj1.save()
         obj2.save()
 
-        self.assertEqual(obj1.first_tick.activity, act)
-        self.assertEqual(obj2.first_tick.activity, act)
+        self.assertEqual(obj1.first_tick().activity, act)
+        self.assertEqual(obj2.first_tick().activity, act)
 
         # Make sure it didn't do something silly like duplicate the activity.
         self.assertEquals(TestModelActivity.objects.count(), 1)
@@ -104,8 +104,8 @@ class ActivityTests(TestCase):
         obj1.save()
         obj2.save()
 
-        self.assertEqual(obj1.first_tick.activity, act)
-        self.assertEqual(obj2.first_tick.activity, act)
+        self.assertEqual(obj1.first_tick().activity, act)
+        self.assertEqual(obj2.first_tick().activity, act)
 
         # Make sure it didn't do something silly like duplicate the activity.
         self.assertEquals(TestModelActivity.objects.count(), 1)
