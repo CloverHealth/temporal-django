@@ -41,3 +41,32 @@ class IAmTheVeryModelOfAModernLongNamedTemporalIveInformationVegetableAnimalAndM
     vegetable = models.TextField()
     animal = models.TextField()
     mineral = models.TextField()
+
+
+class Stub(models.Model):
+    """We use this as a dummy relationship object"""
+    title = models.CharField(max_length=100)
+
+
+class TestModelActivityWithRelationship(models.Model):
+    stub = models.ForeignKey(Stub)
+
+
+@add_clock('title', activity_model=TestModelActivityWithRelationship)
+class TestModelWithActivityWithRelationship(Clocked):
+    """Another test model using the same activity model as the first"""
+    title = models.CharField(max_length=100)
+
+
+class TestModelActivityWithEfficientRelationship(models.Model):
+    stub = models.ForeignKey(Stub)
+
+    @staticmethod
+    def temporal_queryset_options(queryset):
+        return queryset.select_related('activity__stub')
+
+
+@add_clock('title', activity_model=TestModelActivityWithEfficientRelationship)
+class TestModelWithActivityWithEfficientRelationship(Clocked):
+    """Another test model using the same activity model as the first"""
+    title = models.CharField(max_length=100)
