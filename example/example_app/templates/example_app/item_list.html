@@ -1,0 +1,49 @@
+{% extends 'example_app/base.html' %}
+
+{% block content %}
+  <div class="row">
+    <div class="col">
+      {% if object_list %}
+        <h2>Items</h2>
+        <table class="table table-responsive">
+          <thead>
+            <th>Title</th>
+            <th>Effective Date</th>
+            <th>Date Created</th>
+            <th>Date Modified</th>
+            <th>Last Edited By</th>
+            <th>Revisions</th>
+            <th>Actions</th>
+          </thead>
+          <tbody>
+          {% for item in object_list %}
+            <tr>
+              <td><a href="{% url 'example_app:view' item.id %}">{{ item.number }}. {{ item.title }}</a></td>
+              <td>{{ item.effective_date }}</td>
+              <td>{{ item.date_created }}</td>
+              <td>{{ item.date_modified }}</td>
+              <td>
+                {% if item.latest_tick.activity.author %}
+                {{ item.latest_tick.activity.author }}
+                {% else %}
+                Anonymous user
+                {% endif %}
+              </td>
+              <td>{{ item.clock.count }}</td>
+              <td>
+                <a href="{% url 'example_app:update' item.id %}">
+                  Edit <span class="fa fa-edit"></span>
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>There are no items yet. Create an item to start.</p>
+      {% endif %}
+
+      <a href="{% url 'example_app:create' %}" class="btn btn-outline-primary">Create an item</a>
+    </div>
+  </div>
+{% endblock %}

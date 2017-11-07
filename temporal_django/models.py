@@ -14,6 +14,18 @@ class EntityClock(models.Model):
         abstract = True
 
 
+TimelineFieldHistory = typing.NamedTuple('TimelineFieldHistory', [
+    ('value', typing.Any),
+    ('label', str),
+])
+
+
+TimelineTick = typing.NamedTuple('TimelineTick', [
+    ('clock', EntityClock),
+    ('changed_fields', typing.Dict[str, TimelineFieldHistory])
+])
+
+
 class FieldHistory(models.Model):
     """Model for a column/field history table"""
     entity = None  # type: models.ForeignKey
@@ -65,6 +77,52 @@ class Clocked(models.Model):
         latest_tick = self.latest_tick()
         if latest_tick:
             return latest_tick.timestamp
+
+    def temporal_timeline(self) -> typing.List[TimelineTick]:
+        """
+        Returns a timeline of field changes grouped by clock tick
+
+        The return format is a list of clock ticks with per-field history for each:
+
+        {
+            clock: Clocked,
+            changed_fields: {
+                [field_name]: {
+                    value: any,
+                    label: str
+                }
+            }
+        }
+        """
+        temporal_options = type(self).temporal_options
+        timeline = []
+        field_history = {
+            field: getattr(self, '%s_history' % field).all()
+            for field in
+            temporal_options.temporal_fields
+        }
+
+        if temporal_options.activity_model:
+            clock_query = self.clock.select_related('activity')
+            if hasattr(temporal_options.activity_model, 'temporal_queryset_options'):
+                temporal_options.activity_model.temporal_queryset_options(clock_query)
+            clock_query = clock_query.all()
+        else:
+            clock_query = self.clock.all()
+
+        for clock in clock_query:
+            changed_fields = {}
+            for field, history in field_history.items():
+                for field_history_item in history:
+                    if field_history_item.vclock.lower == clock.tick:
+                        changed_fields[field] = TimelineFieldHistory(
+                            value=getattr(field_history_item, field),
+                            label=type(self)._meta.get_field(field).verbose_name,
+                        )
+
+            timeline.append(TimelineTick(clock=clock, changed_fields=changed_fields))
+
+        return timeline
 
 
 class ClockedOption:

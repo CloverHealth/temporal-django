@@ -1,0 +1,14 @@
+{% extends 'example_app/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="row">
+  <div class="col">
+    <form action="" method="post">{% csrf_token %}
+      <h2>{% if object %}Edit{% else %}Create{% endif %} item</h2>
+      {{ form|crispy }}
+      <input type="submit" class="btn btn-primary" value="{% if object %}Save{% else %}Create{% endif %}" />
+    </form>
+  </div>
+</div>
+{% endblock %}
