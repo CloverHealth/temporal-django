@@ -12,7 +12,7 @@ from django.contrib.postgres.fields.ranges import DateTimeRangeField, IntegerRan
 from django.db import models
 from django.db.models.signals import post_init
 
-from .db_extensions import GistIndex, GistExclusionConstraint
+from .db_extensions import GistExclusionConstraint
 
 from .models import (Clocked, EntityClock, FieldHistory)
 from .clocked_option import InternalClockedOption
@@ -132,10 +132,6 @@ def _build_field_history_model(cls: typing.Type[Clocked], field: str, schema: st
             'app_label': cls._meta.app_label,
             'db_table': table_name,
             'indexes': [
-                GistIndex(
-                    fields=['effective'],
-                    name=_truncate_identifier('ix_' + table_name + '_effective')
-                ),
                 GistExclusionConstraint(
                     fields=['(%s) WITH =, effective WITH &&' % gist_exclusion_key],
                     name=_truncate_identifier(table_name + '_excl_effective'),
