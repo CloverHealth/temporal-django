@@ -35,32 +35,24 @@ class ActivityTests(TestCase):
         This is to avoid user expectation mismatch of thinking that their activities are being
         associated correctly.
         """
-        act = TestModelActivity(desc='Create the object')
-        act.save()
-
         obj = NoActivityModel(title='Test', num=1)
-        obj.activity = act
         with self.assertRaisesMessage(ValueError, 'no activity model'):
-            obj.save()
+            obj.save(activity=TestModelActivity(desc='Create the object'))
 
     def test_no_same_model_activity_reuse(self):
         """You shouldn't be able to re-use an activity for the same model"""
         act = TestModelActivity(desc='Create the object')
-        act.save()
 
         obj = TestModel(title='Test', num=1)
-        obj.activity = act
-        obj.save()
+        obj.save(activity=act)
 
         created_obj = TestModel.objects.first()
-
         created_obj.title = 'Test 2'
-        created_obj.activity = act
 
         with self.assertRaises(IntegrityError):
             # We don't have a fancy error message because it'd be inefficient to check for this
             # use case. Intead we'll let the DB catch it and blow up.
-            created_obj.save()
+            created_obj.save(activity=act)
 
     def test_activity_with_multiple_models(self):
         """
@@ -69,16 +61,12 @@ class ActivityTests(TestCase):
         """
 
         act = TestModelActivity(desc='Create two objects!')
-        act.save()
 
         obj1 = TestModel(title='Test', num=1)
         obj2 = AnotherTestModel(title='Test')
 
-        obj1.activity = act
-        obj2.activity = act
-
-        obj1.save()
-        obj2.save()
+        obj1.save(activity=act)
+        obj2.save(activity=act)
 
         self.assertEqual(obj1.first_tick().activity, act)
         self.assertEqual(obj2.first_tick().activity, act)
@@ -93,19 +81,27 @@ class ActivityTests(TestCase):
         """
 
         act = TestModelActivity(desc='Create two objects!')
-        act.save()
 
         obj1 = TestModel(title='Test 1', num=1)
         obj2 = TestModel(title='Test 2', num=2)
 
-        obj1.activity = act
-        obj2.activity = act
-
-        obj1.save()
-        obj2.save()
+        obj1.save(activity=act)
+        obj2.save(activity=act)
 
         self.assertEqual(obj1.first_tick().activity, act)
         self.assertEqual(obj2.first_tick().activity, act)
 
         # Make sure it didn't do something silly like duplicate the activity.
         self.assertEquals(TestModelActivity.objects.count(), 1)
+
+    def test_direct_set_activity(self):
+        """Sometimes it may be useful to specify an activity ahead of time and use the default save"""
+        act = TestModelActivity(desc='Create two objects!')
+        act.save()
+
+        obj = TestModel(title='Test', num=1)
+        obj.activity = act
+
+        obj.save()
+
+        self.assertEqual(obj.first_tick().activity, act)

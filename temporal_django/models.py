@@ -1,7 +1,7 @@
 import datetime
 import typing  # noqa
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.postgres.fields import DateTimeRangeField, IntegerRangeField
 
 
@@ -77,6 +77,18 @@ class Clocked(models.Model):
         latest_tick = self.latest_tick()
         if latest_tick:
             return latest_tick.timestamp
+
+    @transaction.atomic
+    def save(self, *args, activity=None, **kwargs):
+        """
+        Overrides save to force atomic transactions for temporal and to allow a convenience method for
+        specifying an action.
+        """
+        if activity:
+            if not activity.pk:
+                activity.save()
+            self.activity = activity
+        super().save(*args, **kwargs)
 
     def temporal_timeline(self) -> typing.List[TimelineTick]:
         """
