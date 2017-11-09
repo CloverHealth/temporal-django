@@ -77,6 +77,7 @@ def _build_entity_clock_model(
         unique_constraints = (unique_constraints, ('entity', 'activity'))
 
     attrs = dict(
+        id=models.UUIDField(primary_key=True, default=uuid.uuid4),
         tick=models.IntegerField(),
         entity=models.ForeignKey(
             cls,
